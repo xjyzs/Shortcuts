@@ -17,7 +17,30 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")
-        resourceConfigurations += setOf("zh")
+        androidResources. localeFilters+= listOf("zh")
+    }
+
+    flavorDimensions += "abi"
+    productFlavors {
+        create("x86") {
+            dimension = "abi"
+            ndk { abiFilters.add("x86") }
+        }
+        create("x86_64") {
+            dimension = "abi"
+            ndk { abiFilters.add("x86_64") }
+        }
+        create("arm") {
+            dimension = "abi"
+            ndk { abiFilters.add("armeabi-v7a") }
+        }
+        create("arm64") {
+            dimension = "abi"
+            ndk { abiFilters.add("arm64-v8a") }
+        }
+        create("universal") {
+            dimension = "abi"
+        }
     }
 
     buildTypes {
@@ -56,19 +79,13 @@ android {
 }
 
 dependencies {
-
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.lifecycle.runtime.ktx)
+    //implementation(libs.androidx.core.ktx)
+    //implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
-    implementation(libs.androidx.ui.graphics)
-    implementation(libs.androidx.ui.tooling.preview)
+    //implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.material3)
-    implementation(libs.androidx.appcompat)
-    implementation(libs.material)
-    implementation(libs.androidx.activity)
-    implementation(libs.androidx.constraintlayout)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -76,5 +93,4 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
-    //implementation (libs.kotlinx.serialization.json)
 }
