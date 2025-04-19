@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Shortcuts</string>
+    <string name="title_activity_python_runner">PythonRunner</string>
+    <string name="title_activity_settings">SettingsActivity</string>
+</resources>
