@@ -1,8 +1,10 @@
 package com.xjyzs.shortcuts
 
+import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -62,7 +64,10 @@ fun Ui() {
         mtPref = Color.Green
     }
     var mt by remember { mutableStateOf(mtPref) }
-    Column(Modifier.statusBarsPadding().wrapContentSize(Alignment.Center).padding(10.dp)) {
+    Column(Modifier
+        .statusBarsPadding()
+        .wrapContentSize(Alignment.Center)
+        .padding(10.dp)) {
         Row(
             Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically
         ) {
@@ -151,14 +156,18 @@ done
         }
 
         //adb
-        val process=Runtime.getRuntime().exec(arrayOf("su", "-c", "getprop service.adb.tcp.port"))
-        val inputReader = BufferedReader(InputStreamReader(process.inputStream)).readLine()
         var adb by remember { mutableStateOf(Color.Red) }
         var adbport by remember { mutableStateOf("33445") }
         LaunchedEffect(Unit) {
-            if (inputReader.isNotEmpty()) {
-                adb = Color.Green
-                adbport = inputReader
+            try {
+                val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "getprop service.adb.tcp.port"))
+                val inputReader = BufferedReader(InputStreamReader(process.inputStream)).readLine()
+                if (inputReader.isNotEmpty()) {
+                    adb = Color.Green
+                    adbport = inputReader
+                }
+            }catch(e:Exception) {
+                Toast.makeText(context, "请先授予 ROOT 权限".toString(), Toast.LENGTH_SHORT).show()
             }
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
