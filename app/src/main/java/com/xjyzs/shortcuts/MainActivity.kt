@@ -119,7 +119,7 @@ fun Ui() {
                     apply()
                 }
                 charge = Color.Green
-                val controlType=if(threshold.toString() > 81){"night_charging"}else{"input_suspend"}
+                val controlType=if(threshold.toInt() > 81){"night_charging"}else{"input_suspend"}
                 Runtime.getRuntime().exec(
                     arrayOf("su", "-c", """
 dir="/sys/class/power_supply/battery/capacity"
