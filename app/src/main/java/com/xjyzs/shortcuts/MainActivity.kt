@@ -125,7 +125,7 @@ dir="/sys/class/power_supply/battery/capacity"
 while true; do
     capacity=$(cat ${'$'}dir)
     if [ ${'$'}capacity -gt $threshold ]; then
-        echo 1 > /sys/class/power_supply/battery/input_suspend
+        echo 1 > /sys/class/power_supply/battery/night_charging
         echo "已停止充电"
         break
     fi
