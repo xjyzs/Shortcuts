@@ -119,13 +119,15 @@ fun Ui() {
                     apply()
                 }
                 charge = Color.Green
+                val controlType=if(threshold.toString() > 81){"night_charging"}else{"input_suspend"}
                 Runtime.getRuntime().exec(
                     arrayOf("su", "-c", """
 dir="/sys/class/power_supply/battery/capacity"
 while true; do
     capacity=$(cat ${'$'}dir)
     if [ ${'$'}capacity -gt $threshold ]; then
-        echo 1 > /sys/class/power_supply/battery/night_charging
+        chmod 664 /sys/class/power_supply/battery/$controlType
+        echo 1 > /sys/class/power_supply/battery/$controlType
         echo "已停止充电"
         break
     fi
@@ -147,7 +149,7 @@ done
                     arrayOf(
                         "su",
                         "-c",
-                        "echo 0 > /sys/class/power_supply/battery/input_suspend;pkill -f \"已停止充电\""
+                        "echo 0 > /sys/class/power_supply/battery/night_charging;echo 0 > /sys/class/power_supply/battery/input_suspend;pkill -f \"已停止充电\""
                     )
                 )
             }) {
