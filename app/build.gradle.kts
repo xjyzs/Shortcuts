@@ -20,6 +20,16 @@ android {
         androidResources. localeFilters+= listOf("zh")
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("${project.rootDir}/keystore.jks")
+            storePassword = System.getenv("KEY_STORE_PASSWORD") ?: ""
+            keyAlias = System.getenv("KEY_ALIAS") ?: ""
+            keyPassword = System.getenv("KEY_PASSWORD") ?: ""
+            enableV1Signing=false
+        }
+    }
+    
     flavorDimensions += "abi"
     productFlavors {
         create("x86") {
