@@ -34,9 +34,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xjyzs.shortcuts.ui.theme.ShortcutsTheme
+import kotlinx.coroutines.delay
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.OutputStream
+import kotlin.concurrent.thread
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -139,14 +141,22 @@ fun Ui() {
             Spacer(Modifier.weight(1f))
             Button({
                 charge = Color.Green
-                val controlType=if(threshold.toInt() > 79){"night_charging"}else{"input_suspend"}
-                outputStream!!.write("\n".toByteArray())
-                Runtime.getRuntime().exec(
-                    arrayOf("su", "-c", """
+                val controlType = if (threshold.toInt() > 79) {
+                    "night_charging"
+                } else {
+                    "input_suspend"
+                }
+                thread {
+                    outputStream!!.write("pkill -f 已停止充电\n".toByteArray())
+                    outputStream!!.flush()
+                    Thread.sleep(100)
+                    Runtime.getRuntime().exec(
+                        arrayOf(
+                            "su", "-c", """
 dir="/sys/class/power_supply/battery/capacity"
 while true; do
     capacity=$(cat ${'$'}dir)
-    if [ ${'$'}capacity -gt ${threshold.toInt()-1} ]; then
+    if [ ${'$'}capacity -gt ${threshold.toInt() - 1} ]; then
         chmod 664 /sys/class/power_supply/battery/$controlType
         echo 1 > /sys/class/power_supply/battery/$controlType
         chmod 444 /sys/class/power_supply/battery/$controlType
@@ -156,14 +166,15 @@ while true; do
     sleep 3
 done
 """
+                        )
                     )
-                )
+                }
             }) {
                 Text("启动")
             }
             Button({
                 charge = Color.Red
-                outputStream!!.write("echo 0 > /sys/class/power_supply/battery/night_charging;echo 0 > /sys/class/power_supply/battery/input_suspend;pkill -f \"已停止充电\"\n".toByteArray())
+                outputStream!!.write("chmod 664 /sys/class/power_supply/battery/night_charging;echo 0 > /sys/class/power_supply/battery/night_charging;chmod 664 /sys/class/power_supply/battery/input_suspend;echo 0 > /sys/class/power_supply/battery/input_suspend;pkill -f 已停止充电\n".toByteArray())
                 outputStream!!.flush() }) {
                 Text("关闭")
             }
