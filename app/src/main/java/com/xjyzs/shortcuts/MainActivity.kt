@@ -1,6 +1,11 @@
 package com.xjyzs.shortcuts
 
+import android.app.Activity
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -33,8 +38,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.app.ActivityCompat.requestPermissions
+import androidx.core.app.NotificationCompat
 import com.xjyzs.shortcuts.ui.theme.ShortcutsTheme
-import kotlinx.coroutines.delay
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.OutputStream
@@ -67,6 +73,7 @@ fun Ui() {
     var outputStream by remember { mutableStateOf<OutputStream?>(null) }
     var reader: BufferedReader
     LaunchedEffect(Unit) {
+        createNotificationChannel(context)
         try {
             process = ProcessBuilder("su").apply {
                 redirectErrorStream(true)
@@ -150,7 +157,7 @@ fun Ui() {
                     outputStream!!.write("pkill -f 已停止充电\n".toByteArray())
                     outputStream!!.flush()
                     Thread.sleep(100)
-                    Runtime.getRuntime().exec(
+                    val p = Runtime.getRuntime().exec(
                         arrayOf(
                             "su", "-c", """
 dir="/sys/class/power_supply/battery/capacity"
@@ -160,7 +167,11 @@ while true; do
         chmod 664 /sys/class/power_supply/battery/$controlType
         echo 1 > /sys/class/power_supply/battery/$controlType
         chmod 444 /sys/class/power_supply/battery/$controlType
-        echo "已停止充电"
+        if [ "$controlType" == "input_suspend" ]; then
+            echo "已停止充电"
+        else
+            echo "已开启旁路供电"
+        fi
         break
     fi
     sleep 3
@@ -168,6 +179,21 @@ done
 """
                         )
                     )
+                    p.inputStream?.use { stream ->
+                        val ln = BufferedReader(InputStreamReader(stream)).readLine()
+                        if (ln != null) {
+                            if (ln.isNotEmpty()) {
+                                val notificationManager =
+                                    context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                                val notification = NotificationCompat.Builder(context, "default")
+                                    .setContentTitle("Shortcuts")
+                                    .setContentText(ln)
+                                    .setSmallIcon(R.drawable.icon)
+                                    .build()
+                                notificationManager.notify(1, notification)
+                            }
+                        }
+                    }
                 }
             }) {
                 Text("启动")
@@ -220,4 +246,22 @@ done
             }
         }
     }
+}
+
+
+fun createNotificationChannel(context: Context) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        requestPermissions(context as Activity,arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 2)
+    }
+    val channel = NotificationChannel(
+        "default",
+        "默认通知渠道",
+        NotificationManager.IMPORTANCE_HIGH
+    ).apply {
+        description = "默认"
+    }
+
+    val notificationManager =
+        context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    notificationManager.createNotificationChannel(channel)
 }
