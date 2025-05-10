@@ -1,7 +1,5 @@
 package com.xjyzs.shortcuts
 
-import android.app.AlertDialog
-import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
@@ -38,6 +36,7 @@ import androidx.compose.ui.unit.sp
 import com.xjyzs.shortcuts.ui.theme.ShortcutsTheme
 import java.io.BufferedReader
 import java.io.InputStreamReader
+import java.io.OutputStream
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -57,13 +56,55 @@ class MainActivity : ComponentActivity() {
 fun Ui() {
     //Initialize
     val context = LocalContext.current
-    val s = context.getSharedPreferences("s", Context.MODE_PRIVATE)
-    //MT
-    var mtPref = Color.Red
-    if (s.getBoolean("mt", false)) {
-        mtPref = Color.Green
+    var adb by remember { mutableStateOf(Color.Red) }
+    var adbPort by remember { mutableStateOf("33445") }
+    var charge by remember { mutableStateOf(Color.Red) }
+    var threshold by remember { mutableStateOf("82") }
+    var mt by remember { mutableStateOf(Color.Red) }
+    var process: Process
+    var outputStream by remember { mutableStateOf<OutputStream?>(null) }
+    var reader: BufferedReader
+    LaunchedEffect(Unit) {
+        try {
+            process = ProcessBuilder("su").apply {
+                redirectErrorStream(true)
+            }.start()
+            outputStream = process.outputStream
+            reader = BufferedReader(InputStreamReader(process.inputStream))
+            var line= ""
+            outputStream!!.write("getprop service.adb.tcp.port\n".toByteArray())
+            outputStream!!.flush()
+            line = reader.readLine()
+            if (line.isNotEmpty()) {
+                adb = Color.Green
+                adbPort = line
+            }
+            outputStream!!.write("pgrep -fl 已停止充电; echo ''\n".toByteArray())
+            outputStream!!.flush()
+            line = reader.readLine()
+            if (line.isNotEmpty()) {
+                charge = Color.Green
+                val regex =
+                    Regex("capacity -gt (?<capacity>.*?) ]")
+                val matchResult = regex.findAll(line)
+                for (i in matchResult){
+                    threshold=(i.groups["capacity"]?.value!!.toInt()+1).toString()
+                }
+                reader.readLine()
+            }
+            outputStream!!.write("pm list packages -3 | grep bin.mt.plus.canary; echo ''\n".toByteArray())
+            outputStream!!.flush()
+            line = reader.readLine()
+            if (line.isNotEmpty()) {
+                mt = Color.Green
+                reader.readLine()
+            }
+        }catch(_:Exception) {
+            Toast.makeText(context, "请先授予 ROOT 权限".toString(), Toast.LENGTH_SHORT).show()
+        }
     }
-    var mt by remember { mutableStateOf(mtPref) }
+
+    //MT
     Column(Modifier
         .statusBarsPadding()
         .wrapContentSize(Alignment.Center)
@@ -75,32 +116,15 @@ fun Ui() {
             Text("•", color = mt, fontSize = 30.sp)
             Spacer(Modifier.weight(1f))
             Button({
-                with(s.edit()) {
-                    putBoolean("mt", true)
-                    apply()
-                }
                 mt = Color.Green
-                Runtime.getRuntime().exec(
-                    arrayOf(
-                        "su",
-                        "-c",
-                        """pm unhide bin.mt.plus.canary;am start bin.mt.plus.canary/bin.mt.plus.Main"""))}) { Text("启动") }
+                outputStream!!.write("pm unhide bin.mt.plus.canary;am start bin.mt.plus.canary/bin.mt.plus.Main\n".toByteArray())
+                outputStream!!.flush()}) { Text("启动") }
             Button({
-                with(s.edit()) {
-                    putBoolean("mt", false)
-                    apply()
-                }
                 mt = Color.Red
-                Runtime.getRuntime().exec(arrayOf("su", "-c", "pm hide bin.mt.plus.canary"))
-            }) { Text("关闭") }
+                outputStream!!.write("pm hide bin.mt.plus.canary\n".toByteArray())
+                outputStream!!.flush() }) { Text("关闭") }
         }
         //Charge
-        var chargePref = Color.Red
-        if (s.getBoolean("charge", false)) {
-            chargePref = Color.Green
-        }
-        var charge by remember { mutableStateOf(chargePref) }
-        var threshold by remember { mutableStateOf("83") }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("充电管理", fontSize = 24.sp)
             Text("•", color = charge, fontSize = 30.sp)
@@ -114,20 +138,18 @@ fun Ui() {
             )
             Spacer(Modifier.weight(1f))
             Button({
-                with(s.edit()) {
-                    putBoolean("charge", true)
-                    apply()
-                }
                 charge = Color.Green
-                val controlType=if(threshold.toInt() > 81){"night_charging"}else{"input_suspend"}
+                val controlType=if(threshold.toInt() > 79){"night_charging"}else{"input_suspend"}
+                outputStream!!.write("\n".toByteArray())
                 Runtime.getRuntime().exec(
                     arrayOf("su", "-c", """
 dir="/sys/class/power_supply/battery/capacity"
 while true; do
     capacity=$(cat ${'$'}dir)
-    if [ ${'$'}capacity -gt $threshold ]; then
+    if [ ${'$'}capacity -gt ${threshold.toInt()-1} ]; then
         chmod 664 /sys/class/power_supply/battery/$controlType
         echo 1 > /sys/class/power_supply/battery/$controlType
+        chmod 444 /sys/class/power_supply/battery/$controlType
         echo "已停止充电"
         break
     fi
@@ -140,68 +162,36 @@ done
                 Text("启动")
             }
             Button({
-                with(s.edit()) {
-                    putBoolean("charge", false)
-                    apply()
-                }
                 charge = Color.Red
-                Runtime.getRuntime().exec(
-                    arrayOf(
-                        "su",
-                        "-c",
-                        "echo 0 > /sys/class/power_supply/battery/night_charging;echo 0 > /sys/class/power_supply/battery/input_suspend;pkill -f \"已停止充电\""
-                    )
-                )
-            }) {
+                outputStream!!.write("echo 0 > /sys/class/power_supply/battery/night_charging;echo 0 > /sys/class/power_supply/battery/input_suspend;pkill -f \"已停止充电\"\n".toByteArray())
+                outputStream!!.flush() }) {
                 Text("关闭")
             }
         }
 
         //adb
-        var adb by remember { mutableStateOf(Color.Red) }
-        var adbport by remember { mutableStateOf("33445") }
-        LaunchedEffect(Unit) {
-            try {
-                val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "getprop service.adb.tcp.port"))
-                val inputReader = BufferedReader(InputStreamReader(process.inputStream)).readLine()
-                if (inputReader.isNotEmpty()) {
-                    adb = Color.Green
-                    adbport = inputReader
-                }
-            }catch(e:Exception) {
-                Toast.makeText(context, "请先授予 ROOT 权限".toString(), Toast.LENGTH_SHORT).show()
-            }
-        }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("ADB", fontSize = 24.sp)
             Text("•", color = adb, fontSize = 30.sp)
             TextField(
                 label = { Text("端口") },
                 singleLine = true,
-                value = adbport,
-                onValueChange = { adbport = it },
+                value = adbPort,
+                onValueChange = { adbPort = it },
                 modifier = Modifier.width(104.dp)
             )
             Spacer(Modifier.weight(1f))
             Button({
-                with(s.edit()) {
-                    putBoolean("adb", true)
-                    apply()
-                }
                 adb = Color.Green
-                Runtime.getRuntime().exec(arrayOf("su", "-c", "setprop service.adb.tcp.port ${adbport};stop adbd;start adbd"))
+                outputStream!!.write("setprop service.adb.tcp.port ${adbPort};stop adbd;start adbd\n".toByteArray())
+                outputStream!!.flush()
             }) {
                 Text("启动")
             }
             Button({
-                with(s.edit()) {
-                    putBoolean("adb", false)
-                    apply()
-                }
                 adb = Color.Red
-                Runtime.getRuntime().exec(
-                    arrayOf("su", "-c", "setprop service.adb.tcp.port '';stop adbd;start adbd")
-                )
+                outputStream!!.write("setprop service.adb.tcp.port '';stop adbd;start adbd\n".toByteArray())
+                outputStream!!.flush()
             }) {
                 Text("关闭")
             }

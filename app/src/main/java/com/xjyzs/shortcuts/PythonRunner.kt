@@ -1,7 +1,9 @@
 package com.xjyzs.shortcuts
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
@@ -51,6 +53,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import com.xjyzs.shortcuts.ui.theme.ShortcutsTheme
 import java.io.File
@@ -69,8 +73,6 @@ class PythonRunner : ComponentActivity() {
         }
     }
 }
-
-@RequiresApi(Build.VERSION_CODES.R)
 @OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("UnrememberedMutableState")
 @Composable
@@ -85,11 +87,17 @@ fun FileExplorer() {
         directories=directoryFile.readLines().toTypedArray()
     }
     LaunchedEffect(Unit) {
-        if (!Environment.isExternalStorageManager()){
-            val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
-            intent.data = "package:com.xjyzs.shortcuts".toUri()
-            context.startActivity(intent)
-            (context as ComponentActivity).finish()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (!Environment.isExternalStorageManager()) {
+                val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
+                intent.data = "package:com.xjyzs.shortcuts".toUri()
+                context.startActivity(intent)
+                (context as ComponentActivity).finish()
+            }
+        } else{
+            if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED){
+                ActivityCompat.requestPermissions(context as Activity,arrayOf(android.Manifest.permission.READ_EXTERNAL_STORAGE),1001)
+            }
         }
     }
     Scaffold(
@@ -125,7 +133,9 @@ fun FileExplorer() {
             )
         }) { innerPadding ->
         Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(innerPadding)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -163,6 +173,7 @@ fun FileExplorer() {
                     Text("cd", fontSize = 24.sp, fontWeight = FontWeight.Normal)
                 }
             }
+            // 可选：显示Dialog弹窗
             for (i in directories) {
                 var dir=i
                 if (i.takeLast(1)=="/"){
@@ -211,7 +222,9 @@ input text "python3 ${dir}/${j}.py
                         shape = RectangleShape,
                         contentPadding = PaddingValues(0.dp)
                     ) {
-                        Row(Modifier.weight(1f).padding(vertical = 10.dp)) {
+                        Row(Modifier
+                            .weight(1f)
+                            .padding(vertical = 10.dp)) {
                             Text(
                                 j,
                                 fontSize = 24.sp,
