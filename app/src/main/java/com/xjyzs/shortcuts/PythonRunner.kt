@@ -161,7 +161,7 @@ fun FileExplorer() {
                         arrayOf(
                             "su",
                             "-c",
-                            "am start com.termux/com.termux.HomeActivity;input text 'cd /storage/emulated/0/\n';am start -f 0x20000000 com.xjyzs.shortcuts/com.xjyzs.shortcuts.PythonRunner"
+                            "am start -W com.termux/com.termux.HomeActivity;input text 'cd /storage/emulated/0/\n';am start -f 0x20000000 com.xjyzs.shortcuts/com.xjyzs.shortcuts.PythonRunner"
                         )
                     )
                 },
@@ -194,7 +194,7 @@ fun FileExplorer() {
                                     arrayOf(
                                         "su",
                                         "-c",
-                                        """am start com.termux/com.termux.HomeActivity
+                                        """am start -W com.termux/com.termux.HomeActivity
 if ! pgrep -x "gitstatusd-linu"> /dev/null; then
     input text "debian
 "
@@ -210,7 +210,7 @@ input text "python3 ${dir}/${j}.py
                                     arrayOf(
                                         "su",
                                         "-c",
-                                        "am start com.termux/com.termux.HomeActivity;input text 'python ${dir}/${j}.py\n'"
+                                        "am start -W com.termux/com.termux.HomeActivity;input text 'python ${dir}/${j}.py\n'"
                                     )
                                 )
                             }
