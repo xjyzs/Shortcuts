@@ -67,11 +67,12 @@ fun Ui() {
     var adb by remember { mutableStateOf(Color.Red) }
     var adbPort by remember { mutableStateOf("33445") }
     var charge by remember { mutableStateOf(Color.Red) }
-    var threshold by remember { mutableStateOf("82") }
     var mt by remember { mutableStateOf(Color.Red) }
     var process: Process
     var outputStream by remember { mutableStateOf<OutputStream?>(null) }
     var reader: BufferedReader
+    var pref=context.getSharedPreferences("main", Context.MODE_PRIVATE)
+    var threshold by remember { mutableStateOf(pref.getString("threshold","80").toString()) }
     LaunchedEffect(Unit) {
         createNotificationChannel(context)
         try {
@@ -81,12 +82,13 @@ fun Ui() {
             outputStream = process.outputStream
             reader = BufferedReader(InputStreamReader(process.inputStream))
             var line= ""
-            outputStream!!.write("getprop service.adb.tcp.port\n".toByteArray())
+            outputStream!!.write("getprop service.adb.tcp.port; echo ''\n".toByteArray())
             outputStream!!.flush()
             line = reader.readLine()
             if (line.isNotEmpty()) {
                 adb = Color.Green
                 adbPort = line
+                reader.readLine()
             }
             outputStream!!.write("pgrep -fl 已停止充电; echo ''\n".toByteArray())
             outputStream!!.flush()
@@ -111,6 +113,7 @@ fun Ui() {
         }catch(_:Exception) {
             Toast.makeText(context, "请先授予 ROOT 权限".toString(), Toast.LENGTH_SHORT).show()
         }
+        threshold = pref.getString("threshold","80").toString()
     }
 
     //MT
@@ -148,12 +151,16 @@ fun Ui() {
             Spacer(Modifier.weight(1f))
             Button({
                 charge = Color.Green
-                val controlType = if (threshold.toInt() > 79) {
+                val controlType = if (threshold.toInt() >= 80) {
                     "night_charging"
                 } else {
                     "input_suspend"
                 }
                 thread {
+                    with(pref.edit()) {
+                        putString("threshold",threshold)
+                        apply()
+                    }
                     outputStream!!.write("pkill -f 已停止充电\n".toByteArray())
                     outputStream!!.flush()
                     Thread.sleep(100)
