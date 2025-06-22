@@ -2,6 +2,7 @@ package com.xjyzs.shortcuts
 
 import android.content.Intent
 import android.os.Bundle
+import android.os.Environment
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -52,7 +53,7 @@ class SettingsActivity : ComponentActivity() {
 fun SettingsUi() {
     val context = LocalContext.current
     val directoryFile = File(context.filesDir.absolutePath+"/directories")
-    var readDirectories="/sdcard"
+    var readDirectories=Environment.getExternalStorageDirectory().path
     try {
         readDirectories=directoryFile.readText()
     }catch(_:Exception){}

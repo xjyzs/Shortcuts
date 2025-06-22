@@ -1,6 +1,5 @@
 package com.xjyzs.shortcuts
 
-import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -11,7 +10,6 @@ import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -39,7 +37,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -60,7 +57,6 @@ import com.xjyzs.shortcuts.ui.theme.ShortcutsTheme
 import java.io.File
 
 class PythonRunner : ComponentActivity() {
-    @RequiresApi(Build.VERSION_CODES.R)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -74,15 +70,13 @@ class PythonRunner : ComponentActivity() {
     }
 }
 @OptIn(ExperimentalMaterial3Api::class)
-@SuppressLint("UnrememberedMutableState")
 @Composable
 fun FileExplorer() {
-    val fileList: MutableState<List<String>> = mutableStateOf(emptyList())
     var useLinux by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val directoryFile = File(context.filesDir.absolutePath+"/directories")
-    var directories= arrayOf("/sdcard/")
+    var directories= arrayOf(Environment.getExternalStorageDirectory().path)
     if (directoryFile.exists()){
         directories=directoryFile.readLines().toTypedArray()
     }
@@ -173,20 +167,19 @@ fun FileExplorer() {
                     Text("cd", fontSize = 24.sp, fontWeight = FontWeight.Normal)
                 }
             }
-            // 可选：显示Dialog弹窗
             for (i in directories) {
                 var dir=i
                 if (i.takeLast(1)=="/"){
                     dir=dir.dropLast(1)
                 }
-                fileList.value = getFileList(dir)
+                val fileList = getFileList(dir)
                 Text(
                     dir,
                     fontSize = 30.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
-                for (j in fileList.value) {
+                for (j in fileList) {
                     Button(
                         {
                             if (useLinux) {
