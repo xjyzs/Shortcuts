@@ -1,5 +1,6 @@
 package com.xjyzs.shortcuts
 
+import android.Manifest
 import android.app.Activity
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -81,15 +82,14 @@ fun Ui() {
             }.start()
             outputStream = process.outputStream
             reader = BufferedReader(InputStreamReader(process.inputStream))
-            var line= ""
             outputStream!!.write("getprop service.adb.tcp.port; echo ''\n".toByteArray())
             outputStream!!.flush()
-            line = reader.readLine()
+            var line = reader.readLine()
             if (line.isNotEmpty()) {
                 adb = Color.Green
                 adbPort = line
-                reader.readLine()
             }
+            reader.readLine()
             outputStream!!.write("pgrep -fl 已停止充电; echo ''\n".toByteArray())
             outputStream!!.flush()
             line = reader.readLine()
@@ -111,7 +111,7 @@ fun Ui() {
                 reader.readLine()
             }
         }catch(_:Exception) {
-            Toast.makeText(context, "请先授予 ROOT 权限".toString(), Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "请先授予 ROOT 权限", Toast.LENGTH_SHORT).show()
         }
         threshold = pref.getString("threshold","80").toString()
     }
@@ -258,7 +258,7 @@ done
 
 fun createNotificationChannel(context: Context) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        requestPermissions(context as Activity,arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 2)
+        requestPermissions(context as Activity,arrayOf(Manifest.permission.POST_NOTIFICATIONS), 2)
     }
     val channel = NotificationChannel(
         "default",
