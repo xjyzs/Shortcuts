@@ -12,18 +12,28 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LargeFlexibleTopAppBar
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
@@ -34,13 +44,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat.requestPermissions
 import androidx.core.app.NotificationCompat
+import androidx.core.content.edit
 import com.xjyzs.shortcuts.ui.theme.ShortcutsTheme
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -61,19 +72,20 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun Ui() {
     //Initialize
     val context = LocalContext.current
-    var adb by remember { mutableStateOf(Color.Red) }
+    var adb by remember { mutableStateOf(false) }
     var adbPort by remember { mutableStateOf("33445") }
-    var charge by remember { mutableStateOf(Color.Red) }
-    var mt by remember { mutableStateOf(Color.Red) }
+    var charge by remember { mutableStateOf(false) }
+    var mt by remember { mutableStateOf(false) }
     var process: Process
     var outputStream by remember { mutableStateOf<OutputStream?>(null) }
     var reader: BufferedReader
-    var pref=context.getSharedPreferences("main", Context.MODE_PRIVATE)
-    var threshold by remember { mutableStateOf(pref.getString("threshold","80").toString()) }
+    val pref = context.getSharedPreferences("main", Context.MODE_PRIVATE)
+    var threshold by remember { mutableStateOf(pref.getString("threshold", "80").toString()) }
     LaunchedEffect(Unit) {
         createNotificationChannel(context)
         try {
@@ -86,7 +98,7 @@ fun Ui() {
             outputStream!!.flush()
             var line = reader.readLine()
             if (line.isNotEmpty()) {
-                adb = Color.Green
+                adb = true
                 adbPort = line
             }
             reader.readLine()
@@ -94,12 +106,12 @@ fun Ui() {
             outputStream!!.flush()
             line = reader.readLine()
             if (line.isNotEmpty()) {
-                charge = Color.Green
+                charge = true
                 val regex =
                     Regex("capacity -gt (?<capacity>.*?) ]")
                 val matchResult = regex.findAll(line)
-                for (i in matchResult){
-                    threshold=(i.groups["capacity"]?.value!!.toInt()+1).toString()
+                for (i in matchResult) {
+                    threshold = (i.groups["capacity"]?.value!!.toInt() + 1).toString()
                 }
                 reader.readLine()
             }
@@ -107,66 +119,74 @@ fun Ui() {
             outputStream!!.flush()
             line = reader.readLine()
             if (line.isNotEmpty()) {
-                mt = Color.Green
+                mt = true
                 reader.readLine()
             }
-        }catch(_:Exception) {
+        } catch (_: Exception) {
             Toast.makeText(context, "请先授予 ROOT 权限", Toast.LENGTH_SHORT).show()
         }
-        threshold = pref.getString("threshold","80").toString()
+        threshold = pref.getString("threshold", "80").toString()
     }
 
     //MT
-    Column(Modifier
-        .statusBarsPadding()
-        .wrapContentSize(Alignment.Center)
-        .padding(10.dp)) {
-        Row(
-            Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically
+    Scaffold(topBar = {
+        LargeFlexibleTopAppBar(title = {
+            Text(stringResource(R.string.app_name))
+        })
+    }, modifier = Modifier.padding(horizontal = 4.dp)) { innerPadding ->
+        Column(
+            Modifier
+                .padding(innerPadding)
+                .fillMaxSize(), verticalArrangement = Arrangement.Center
         ) {
-            Text("MT管理器", fontSize = 24.sp)
-            Text("•", color = mt, fontSize = 30.sp)
-            Spacer(Modifier.weight(1f))
-            Button({
-                mt = Color.Green
-                outputStream!!.write("pm unhide bin.mt.plus.canary;am start bin.mt.plus.canary/bin.mt.plus.Main\n".toByteArray())
-                outputStream!!.flush()}) { Text("启动") }
-            Button({
-                mt = Color.Red
-                outputStream!!.write("pm hide bin.mt.plus.canary\n".toByteArray())
-                outputStream!!.flush() }) { Text("关闭") }
-        }
-        //Charge
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("充电管理", fontSize = 24.sp)
-            Text("•", color = charge, fontSize = 30.sp)
-            TextField(
-                label = { Text("阈值") },
-                singleLine = true,
-                value = threshold,
-                onValueChange = { threshold = it },
-                modifier = Modifier.width(57.dp),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-            )
-            Spacer(Modifier.weight(1f))
-            Button({
-                charge = Color.Green
-                val controlType = if (threshold.toInt() >= 80) {
-                    "night_charging"
-                } else {
-                    "input_suspend"
-                }
-                thread {
-                    with(pref.edit()) {
-                        putString("threshold",threshold)
-                        apply()
+            Row(
+                Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("MT管理器", fontSize = 24.sp)
+                Spacer(Modifier.weight(1f))
+                Switch(mt, {
+                    if (mt) {
+                        outputStream!!.write("pm hide bin.mt.plus.canary\n".toByteArray())
+                        outputStream!!.flush()
+                    } else {
+                        outputStream!!.write("pm unhide bin.mt.plus.canary;am start bin.mt.plus.canary/bin.mt.plus.Main\n".toByteArray())
+                        outputStream!!.flush()
                     }
-                    outputStream!!.write("pkill -f 已停止充电\n".toByteArray())
-                    outputStream!!.flush()
-                    Thread.sleep(100)
-                    val p = Runtime.getRuntime().exec(
-                        arrayOf(
-                            "su", "-c", """
+                    mt = !mt
+                })
+            }
+            //Charge
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("充电管理", fontSize = 24.sp)
+                TextField(
+                    label = { Text("阈值") },
+                    singleLine = true,
+                    value = threshold,
+                    onValueChange = { threshold = it },
+                    modifier = Modifier.width(57.dp),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
+                Spacer(Modifier.weight(1f))
+                Switch(charge, {
+                    if (charge) {
+                        outputStream!!.write("chmod 664 /sys/class/power_supply/battery/night_charging;echo 0 > /sys/class/power_supply/battery/night_charging;chmod 664 /sys/class/power_supply/battery/input_suspend;echo 0 > /sys/class/power_supply/battery/input_suspend;pkill -f 已停止充电\n".toByteArray())
+                        outputStream!!.flush()
+                    } else {
+                        val controlType = if (threshold.toInt() >= 80) {
+                            "night_charging"
+                        } else {
+                            "input_suspend"
+                        }
+                        thread {
+                            pref.edit {
+                                putString("threshold", threshold)
+                            }
+                            outputStream!!.write("pkill -f 已停止充电\n".toByteArray())
+                            outputStream!!.flush()
+                            Thread.sleep(100)
+                            val p = Runtime.getRuntime().exec(
+                                arrayOf(
+                                    "su", "-c", """
 dir="/sys/class/power_supply/battery/capacity"
 while true; do
     capacity=$(cat ${'$'}dir)
@@ -184,72 +204,88 @@ while true; do
     sleep 3
 done
 """
-                        )
-                    )
-                    p.inputStream?.use { stream ->
-                        val ln = BufferedReader(InputStreamReader(stream)).readLine()
-                        if (ln != null) {
-                            if (ln.isNotEmpty()) {
-                                val notificationManager =
-                                    context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                                val notification = NotificationCompat.Builder(context, "default")
-                                    .setContentTitle("Shortcuts")
-                                    .setContentText(ln)
-                                    .setSmallIcon(R.drawable.icon)
-                                    .build()
-                                notificationManager.notify(1, notification)
+                                )
+                            )
+                            p.inputStream?.use { stream ->
+                                val ln = BufferedReader(InputStreamReader(stream)).readLine()
+                                if (ln != null) {
+                                    if (ln.isNotEmpty()) {
+                                        val notificationManager =
+                                            context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                                        val notification =
+                                            NotificationCompat.Builder(context, "default")
+                                                .setContentTitle("Shortcuts")
+                                                .setContentText(ln)
+                                                .setSmallIcon(R.drawable.icon)
+                                                .build()
+                                        notificationManager.notify(1, notification)
+                                    }
+                                }
                             }
                         }
                     }
-                }
-            }) {
-                Text("启动")
+                    charge = !charge
+                })
             }
-            Button({
-                charge = Color.Red
-                outputStream!!.write("chmod 664 /sys/class/power_supply/battery/night_charging;echo 0 > /sys/class/power_supply/battery/night_charging;chmod 664 /sys/class/power_supply/battery/input_suspend;echo 0 > /sys/class/power_supply/battery/input_suspend;pkill -f 已停止充电\n".toByteArray())
-                outputStream!!.flush() }) {
-                Text("关闭")
-            }
-        }
 
-        //adb
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("ADB", fontSize = 24.sp)
-            Text("•", color = adb, fontSize = 30.sp)
-            TextField(
-                label = { Text("端口") },
-                singleLine = true,
-                value = adbPort,
-                onValueChange = { adbPort = it },
-                modifier = Modifier.width(104.dp)
-            )
-            Spacer(Modifier.weight(1f))
-            Button({
-                adb = Color.Green
-                outputStream!!.write("setprop service.adb.tcp.port ${adbPort};stop adbd;start adbd\n".toByteArray())
-                outputStream!!.flush()
-            }) {
-                Text("启动")
+            //adb
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("ADB", fontSize = 24.sp)
+                TextField(
+                    label = { Text("端口") },
+                    singleLine = true,
+                    value = adbPort,
+                    onValueChange = { adbPort = it },
+                    modifier = Modifier.width(104.dp)
+                )
+                Spacer(Modifier.weight(1f))
+                Switch(adb, {
+                    if (adb) {
+                        outputStream!!.write("setprop service.adb.tcp.port '';stop adbd;start adbd\n".toByteArray())
+                    } else {
+                        outputStream!!.write("setprop service.adb.tcp.port ${adbPort};stop adbd;start adbd\n".toByteArray())
+                    }
+                    outputStream!!.flush()
+                    adb=!adb
+                })
             }
-            Button({
-                adb = Color.Red
-                outputStream!!.write("setprop service.adb.tcp.port '';stop adbd;start adbd\n".toByteArray())
-                outputStream!!.flush()
-            }) {
-                Text("关闭")
-            }
-        }
 
-        //PythonRunner
-        Row {
-            Text("Python", fontSize = 24.sp)
-            Spacer(Modifier.weight(1f))
-            Button({
-                val intent = Intent(context, PythonRunner::class.java)
-                context.startActivity(intent)
-            }) {
-                Text("启动")
+            //PythonRunner
+            Row(
+                Modifier
+                    .height(48.dp)
+                    .clickable {
+                        val intent = Intent(context, PythonRunner::class.java)
+                        context.startActivity(intent)
+                    }, verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Python", fontSize = 24.sp)
+                Spacer(Modifier.weight(1f))
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowForwardIos,
+                    null,
+                    tint = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            // cpp
+            Row(
+                Modifier
+                    .height(48.dp)
+                    .clickable {
+                        val intent = Intent(context, CppRunner::class.java)
+                        context.startActivity(intent)
+                    }, verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("C++", fontSize = 24.sp)
+                Spacer(Modifier.weight(1f))
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowForwardIos,
+                    null,
+                    tint = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.size(20.dp)
+                )
             }
         }
     }
@@ -258,7 +294,7 @@ done
 
 fun createNotificationChannel(context: Context) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        requestPermissions(context as Activity,arrayOf(Manifest.permission.POST_NOTIFICATIONS), 2)
+        requestPermissions(context as Activity, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 2)
     }
     val channel = NotificationChannel(
         "default",

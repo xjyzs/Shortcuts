@@ -1,6 +1,7 @@
 package com.xjyzs.shortcuts
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -10,6 +11,13 @@ import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -17,6 +25,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -26,12 +35,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -39,8 +50,8 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -52,6 +63,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
@@ -64,7 +76,7 @@ import androidx.core.net.toUri
 import com.xjyzs.shortcuts.ui.theme.ShortcutsTheme
 import java.io.File
 
-class PythonRunner : ComponentActivity() {
+class CppRunner : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -81,10 +93,9 @@ class PythonRunner : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun FileExplorer() {
-    var useLinux by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val directoryFile = File(context.filesDir.absolutePath + "/directories")
@@ -92,6 +103,9 @@ private fun FileExplorer() {
     if (directoryFile.exists()) {
         directories = directoryFile.readLines().toTypedArray()
     }
+    val pref = context.getSharedPreferences("main", Context.MODE_PRIVATE)
+    var options by remember { mutableStateOf(pref.getString("options", "-std=c++26")!!) }
+    var testExamples by remember { mutableStateOf("") }
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             if (!Environment.isExternalStorageManager()) {
@@ -115,9 +129,10 @@ private fun FileExplorer() {
         }
     }
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
         topBar = {
             TopAppBar(
-                title = { Text("Python") },
+                title = { Text("C++") },
                 navigationIcon = {
                     IconButton(
                         onClick = { (context as ComponentActivity).finish() },
@@ -153,9 +168,7 @@ private fun FileExplorer() {
                     containerColor = MaterialTheme.colorScheme.surfaceContainer,
                 )
             )
-        },
-        modifier = Modifier.padding(horizontal = 4.dp),
-        containerColor = MaterialTheme.colorScheme.surfaceContainer
+        }, modifier = Modifier.padding(horizontal = 8.dp)
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -163,27 +176,57 @@ private fun FileExplorer() {
                 .verticalScroll(rememberScrollState())
                 .padding(innerPadding)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Button(
-                    {
-                        useLinux = !useLinux
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        Color.Transparent,
-                        LocalContentColor.current
-                    ),
-                    shape = RectangleShape,
-                    contentPadding = PaddingValues(0.dp)
-                ) {
-                    Text("Linux", fontSize = 30.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.weight(1f))
-                    Switch(checked = useLinux, onCheckedChange = { useLinux = it })
+            var exampleExpanded by remember { mutableStateOf(false) }
+
+            Row(
+                Modifier
+                    .padding(top = 10.dp, bottom = 20.dp)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.secondaryContainer)
+                    .clickable { exampleExpanded = !exampleExpanded }) {
+                Row(Modifier.padding(12.dp)) {
+                    AnimatedContent(
+                        targetState = exampleExpanded,
+                        transitionSpec = {
+                            fadeIn(animationSpec = tween(300)) togetherWith
+                                    fadeOut(animationSpec = tween(300))
+                        }, modifier = Modifier.weight(1f)
+                    ) { isExpanded ->
+                        if (isExpanded) {
+                            TextField(
+                                testExamples,
+                                { testExamples = it },
+                                maxLines = 8,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(end = 6.dp)
+                            )
+                        } else {
+                            Text(
+                                "测试样例: $testExamples",
+                                color = MaterialTheme.colorScheme.primary,
+                                fontSize = 20.sp,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                    val exampleExpandedRotation by animateFloatAsState(
+                        targetValue = if (exampleExpanded) 180f else 0f, animationSpec = tween(
+                            durationMillis = 300, easing = FastOutSlowInEasing
+                        )
+                    )
+                    IconButton({ exampleExpanded = !exampleExpanded }, Modifier.size(24.dp)) {
+                        Icon(
+                            Icons.Default.ExpandMore,
+                            null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.rotate(exampleExpandedRotation)
+                        )
+                    }
                 }
             }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(bottom = 16.dp)
-            ) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 16.dp)) {
                 Row(
                     Modifier
                         .height(48.dp)
@@ -194,7 +237,7 @@ private fun FileExplorer() {
                                 arrayOf(
                                     "su",
                                     "-c",
-                                    "am start -W com.termux/com.termux.HomeActivity;input text 'cd /storage/emulated/0/\n';am start -f 0x20000000 com.xjyzs.shortcuts/com.xjyzs.shortcuts.PythonRunner"
+                                    "am start -W com.termux/com.termux.HomeActivity;input text 'cd /storage/emulated/0/\n';am start -f 0x20000000 com.xjyzs.shortcuts/com.xjyzs.shortcuts.CppRunner"
                                 )
                             )
                         }, verticalAlignment = Alignment.CenterVertically
@@ -207,9 +250,7 @@ private fun FileExplorer() {
                         Icons.AutoMirrored.Filled.ArrowForwardIos,
                         null,
                         tint = MaterialTheme.colorScheme.tertiary,
-                        modifier = Modifier
-                            .size(24.dp)
-                            .padding(end = 8.dp)
+                        modifier = Modifier.size(24.dp).padding(end = 8.dp)
                     )
                 }
             }
@@ -218,7 +259,7 @@ private fun FileExplorer() {
                 if (i.takeLast(1) == "/") {
                     dir = dir.dropLast(1)
                 }
-                val fileList = getFileList(dir, ".py")
+                val fileList = getFileList(dir, ".cpp")
                 Text(
                     dir,
                     fontWeight = FontWeight.Bold,
@@ -229,31 +270,18 @@ private fun FileExplorer() {
                     for (j in 0..<fileList.size) {
                         Button(
                             {
-                                if (useLinux) {
-                                    Runtime.getRuntime().exec(
-                                        arrayOf(
-                                            "su",
-                                            "-c",
-                                            """am start -W com.termux/com.termux.HomeActivity
-if ! pgrep -x "gitstatusd-linu"> /dev/null; then
-    input text "debian
-"
-fi
-input text "source .venv/bin/activate
-"
-input text "python3 "${dir}/${fileList[j]}.py"
-""""
-                                        )
+                                Runtime.getRuntime().exec(
+                                    arrayOf(
+                                        "su",
+                                        "-c",
+                                        "am start -W com.termux/com.termux.HomeActivity;input text 'clang++ $options \"${dir}/${fileList[j]}.cpp\"\n./a.out\n${
+                                            if (testExamples.isNotEmpty()) testExamples + if (!testExamples.endsWith(
+                                                    "\n"
+                                                )
+                                            ) "\n" else "" else ""
+                                        }'"
                                     )
-                                } else {
-                                    Runtime.getRuntime().exec(
-                                        arrayOf(
-                                            "su",
-                                            "-c",
-                                            "am start -W com.termux/com.termux.HomeActivity;input text 'python \"${dir}/${fileList[j]}.py\"\n'"
-                                        )
-                                    )
-                                }
+                                )
                             },
                             colors = ButtonDefaults.buttonColors(
                                 Color.Transparent,
@@ -281,4 +309,3 @@ input text "python3 "${dir}/${fileList[j]}.py"
         }
     }
 }
-
