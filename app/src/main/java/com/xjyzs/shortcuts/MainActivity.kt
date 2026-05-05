@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Activity
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -26,6 +27,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
+import androidx.compose.material3.Badge
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -56,6 +58,7 @@ import com.xjyzs.shortcuts.ui.theme.ShortcutsTheme
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.OutputStream
+import java.net.NetworkInterface
 import kotlin.concurrent.thread
 
 class MainActivity : ComponentActivity() {
@@ -86,6 +89,8 @@ fun Ui() {
     var reader: BufferedReader
     val pref = context.getSharedPreferences("main", Context.MODE_PRIVATE)
     var threshold by remember { mutableStateOf(pref.getString("threshold", "80").toString()) }
+    val ipLst = mutableListOf<String>()
+    var ip by remember { mutableStateOf("") }
     LaunchedEffect(Unit) {
         createNotificationChannel(context)
         try {
@@ -126,6 +131,25 @@ fun Ui() {
             Toast.makeText(context, "请先授予 ROOT 权限", Toast.LENGTH_SHORT).show()
         }
         threshold = pref.getString("threshold", "80").toString()
+        // IP 地址
+        val interfaces = NetworkInterface.getNetworkInterfaces()
+        for (intf in interfaces) {
+            for (addr in intf.inetAddresses) {
+                if (!addr.isLoopbackAddress) {
+                    val addrStr = addr.hostAddress ?: "unknown"
+                    if (!addrStr.contains("fe80")) {
+                        ipLst.add(addrStr)
+                        if ("192." in addrStr) {
+                            ip = addrStr
+                        }
+                    }
+                }
+            }
+        }
+        ipLst.add("127.0.0.1")
+        if (ip.isEmpty()) {
+            ip = "127.0.0.1"
+        }
     }
 
     //MT
@@ -238,6 +262,17 @@ done
                     onValueChange = { adbPort = it },
                     modifier = Modifier.width(104.dp)
                 )
+                Spacer(Modifier.size(4.dp))
+                Badge(Modifier.clickable {
+                    (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setText(
+                        "adb connect $ip:$adbPort"
+                    )
+                }, containerColor = MaterialTheme.colorScheme.tertiary) {
+                    Text(
+                        ip,
+                        fontSize = 14.sp
+                    )
+                }
                 Spacer(Modifier.weight(1f))
                 Switch(adb, {
                     if (adb) {
@@ -246,7 +281,7 @@ done
                         outputStream!!.write("setprop service.adb.tcp.port ${adbPort};stop adbd;start adbd\n".toByteArray())
                     }
                     outputStream!!.flush()
-                    adb=!adb
+                    adb = !adb
                 })
             }
 
